@@ -195,7 +195,7 @@ async def guess(update: Update, context: CallbackContext) -> None:
         keyboard = [[InlineKeyboardButton(f"See Harem", switch_inline_query_current_chat=f"collection.{user_id}")]]
 
 
-        await update.message.reply_text(f'<b><a href="tg://user?id={user_id}">{escape(update.effective_user.first_name)}</a></b> 𝘠𝘰𝘶 𝘎𝘶𝘦𝘴𝘴 𝘈 𝘕𝘦𝘸 𝘊𝘩𝘢𝘳𝘢𝘵𝘦𝘳 🎉 \n\n🌺𝗡𝗔𝗠𝗘: <b>{last_characters[chat_id]["name"]}</b> \n𝗔𝗡𝗜𝗠𝗘: <b>{last_characters[chat_id]["anime"]}</b> \n🐉𝙍𝘼𝙍𝙄𝙏𝙔: <b>{last_characters[chat_id]["rarity"]}</b>\n\nThis Character added in Your harem.. use /harem To see your harem', parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
+        await update.message.reply_text(f'<b><a href="tg://user?id={user_id}">{escape(update.effective_user.first_name)}</a></b>💖 ʏᴏᴜʀ ᴘʀᴏᴘᴏsᴀʟ ᴡᴀs ᴀᴄᴄᴇᴘᴛᴇᴅ 🎉 \n\n 💍 ʏᴏᴜ ʜᴀᴠᴇ ᴀᴅᴅᴇᴅ \n\n 🌺𝗡𝗔𝗠𝗘: <b>{last_characters[chat_id]["name"]}</b> \n𝗔𝗡𝗜𝗠𝗘: <b>{last_characters[chat_id]["anime"]}</b> \n🐉𝙍𝘼𝙍𝙄𝙏𝙔: <b>{last_characters[chat_id]["rarity"]}</b>\n\nᴛᴏ ʏᴏᴜʀ ʜᴀʀᴇᴍ 💎 \n\n💡 ᴄʜᴇᴄᴋ ɪᴛ ᴜsɪɴɢ /ᴍʏʜᴀʀᴇᴍ', parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
 
     else:
         await update.message.reply_text('Please Write Correct Character Name... ❌️')
@@ -239,7 +239,7 @@ def main() -> None:
 
     application.add_handler(CommandHandler("fav", fav, block=False))
     application.add_handler(CommandHandler(["guess", "protecc", "collect", "grab", "marry"], guess, block=False))
-    application.add_handler(CommandHandler("fav", fav, block=False))
+    application.add_handler(CommandHandler("xfav", fav, block=False))
     application.add_handler(MessageHandler(filters.ALL, message_counter, block=False))
 
     application.run_polling(drop_pending_updates=True)
