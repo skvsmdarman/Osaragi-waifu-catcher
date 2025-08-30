@@ -8,7 +8,7 @@ class Config(object):
     TOKEN = "7460131022:AAHL-h2HZ4LVUq9y-5nNsWNWxTfye8pStkA"
     mongo_url = "mongodb+srv://skvsmdarman335s:Starzplay225s@cluster0.7ezycjy.mongodb.net/?retryWrites=true&w=majority"
     PHOTO_URL = ["https://telegra.ph/file/b925c3985f0f325e62e17.jpg", "https://telegra.ph/file/4211fb191383d895dab9d.jpg"]
-    SUPPORT_CHAT = "Collect_em_support"
+    SUPPORT_CHAT = "Crew_Allied"
     UPDATE_CHAT = "OsaragiUpdates"
     BOT_USERNAME = "Osaragi_X_Catcher_Bot"
     CHARA_CHANNEL_ID = "-1002856079592"
