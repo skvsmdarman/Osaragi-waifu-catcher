@@ -313,6 +313,7 @@ async def pre_update_checks(update: Update, context: CallbackContext) -> None:
         raise ApplicationHandlerStop
 
 
+import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from shivu.modules.shop import refresh_shop_job
 
@@ -333,7 +334,7 @@ if __name__ == "__main__":
     LOGGER.info("Bot started")
 
     # Start the scheduler
-    scheduler = AsyncIOScheduler()
+    scheduler = AsyncIOScheduler(timezone=pytz.utc)
     scheduler.add_job(refresh_shop_job, 'interval', hours=24, args=[application])
     scheduler.start()
 
