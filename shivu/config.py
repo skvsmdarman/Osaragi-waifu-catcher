@@ -14,7 +14,7 @@ class Config(object):
     CHARA_CHANNEL_ID = "-1002856079592"
     api_id = 26928136
     api_hash = "1056cd55e07175e8f1bcbb356f4bb8a9"
-    LOG_CHANNEL_ID = 0
+    LOG_CHANNEL_ID = -1002655697240
 
     
 class Production(Config):
