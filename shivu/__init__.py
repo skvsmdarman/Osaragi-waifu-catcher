@@ -29,7 +29,8 @@ SUPPORT_CHAT = Config.SUPPORT_CHAT
 UPDATE_CHAT = Config.UPDATE_CHAT
 BOT_USERNAME = Config.BOT_USERNAME 
 sudo_users = Config.sudo_users
-OWNER_ID = Config.OWNER_ID 
+OWNER_ID = Config.OWNER_ID
+LOG_CHANNEL_ID = Config.LOG_CHANNEL_ID
 
 application = Application.builder().token(TOKEN).build()
 shivuu = Client("Shivu", api_id, api_hash, bot_token=TOKEN)
