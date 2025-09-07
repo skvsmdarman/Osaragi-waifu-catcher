@@ -41,3 +41,11 @@ user_collection = db["user_collection_lmaoooo"]
 group_user_totals_collection = db['group_user_totalsssssss']
 top_global_groups_collection = db['top_global_groups']
 pm_users = db['total_pm_users']
+
+# Admin collections
+banned_users_collection = db.banned_users
+banned_groups_collection = db.banned_groups
+frozen_users_collection = db.frozen_users
+frozen_groups_collection = db.frozen_groups
+bot_settings_collection = db.bot_settings
+shop_inventory_collection = db.shop_inventory

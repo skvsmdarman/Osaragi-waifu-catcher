@@ -8,11 +8,18 @@ from html import escape
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from telegram import Update
-from telegram.ext import CommandHandler, CallbackContext, MessageHandler, filters
+from telegram.ext import CommandHandler, CallbackContext, MessageHandler, filters, TypeHandler
+from telegram.ext.dispatcher import ApplicationHandlerStop
 
 from shivu import collection, top_global_groups_collection, group_user_totals_collection, user_collection, user_totals_collection, shivuu
-from shivu import application, SUPPORT_CHAT, UPDATE_CHAT, db, LOGGER
+from shivu import (
+    application, SUPPORT_CHAT, UPDATE_CHAT, db, LOGGER, OWNER_ID, sudo_users,
+    banned_users_collection, banned_groups_collection,
+    frozen_users_collection, frozen_groups_collection
+)
 from shivu.modules import ALL_MODULES
+from shivu.modules.maintenance import get_maintenance_status, DEFAULT_MAINTENANCE_MESSAGE
+from shivu.modules.catch_limit import get_catch_limit_settings
 
 
 locks = {}
@@ -36,46 +43,56 @@ def escape_markdown(text):
 
 
 async def message_counter(update: Update, context: CallbackContext) -> None:
+    if not update.message:
+        return
+
     chat_id = str(update.effective_chat.id)
     user_id = update.effective_user.id
+
+    # Get global catch limit settings
+    catch_limit_settings = await get_catch_limit_settings()
+
+    # Check if stickers should be counted
+    if update.message.sticker and not catch_limit_settings.get('include_stickers', False):
+        return
+
+    # Check if commands should be counted
+    if update.message.text and update.message.text.startswith('/') and not catch_limit_settings.get('include_commands', False):
+        return
 
     if chat_id not in locks:
         locks[chat_id] = asyncio.Lock()
     lock = locks[chat_id]
 
     async with lock:
+        # Get global frequency and then check for chat-specific override
+        message_frequency = catch_limit_settings.get('frequency', 100)
+        chat_specific_frequency = await user_totals_collection.find_one({'chat_id': chat_id})
+        if chat_specific_frequency and 'message_frequency' in chat_specific_frequency:
+            message_frequency = chat_specific_frequency['message_frequency']
         
-        chat_frequency = await user_totals_collection.find_one({'chat_id': chat_id})
-        if chat_frequency:
-            message_frequency = chat_frequency.get('message_frequency', 100)
-        else:
-            message_frequency = 100
-
-        
+        # Anti-spam logic
         if chat_id in last_user and last_user[chat_id]['user_id'] == user_id:
             last_user[chat_id]['count'] += 1
             if last_user[chat_id]['count'] >= 10:
-            
                 if user_id in warned_users and time.time() - warned_users[user_id] < 600:
                     return
                 else:
-                    
                     await update.message.reply_text(f"⚠️ Don't Spam {update.effective_user.first_name}...\nYour Messages Will be ignored for 10 Minutes...")
                     warned_users[user_id] = time.time()
                     return
         else:
             last_user[chat_id] = {'user_id': user_id, 'count': 1}
 
-    
+        # Increment message count
         if chat_id in message_counts:
             message_counts[chat_id] += 1
         else:
             message_counts[chat_id] = 1
 
-    
+        # Check if it's time to send a character
         if message_counts[chat_id] % message_frequency == 0:
             await send_image(update, context)
-            
             message_counts[chat_id] = 0
             
 async def send_image(update: Update, context: CallbackContext) -> None:
@@ -131,15 +148,20 @@ async def guess(update: Update, context: CallbackContext) -> None:
         
         user = await user_collection.find_one({'id': user_id})
         if user:
-            update_fields = {}
+            update_fields = {'$push': {'characters': last_characters[chat_id]}}
+
+            # Initialize wallet if it doesn't exist
+            if 'wallet' not in user:
+                update_fields['$set'] = {'wallet': 0}
+
             if hasattr(update.effective_user, 'username') and update.effective_user.username != user.get('username'):
-                update_fields['username'] = update.effective_user.username
+                if '$set' not in update_fields: update_fields['$set'] = {}
+                update_fields['$set']['username'] = update.effective_user.username
             if update.effective_user.first_name != user.get('first_name'):
-                update_fields['first_name'] = update.effective_user.first_name
-            if update_fields:
-                await user_collection.update_one({'id': user_id}, {'$set': update_fields})
-            
-            await user_collection.update_one({'id': user_id}, {'$push': {'characters': last_characters[chat_id]}})
+                if '$set' not in update_fields: update_fields['$set'] = {}
+                update_fields['$set']['first_name'] = update.effective_user.first_name
+
+            await user_collection.update_one({'id': user_id}, update_fields)
       
         elif hasattr(update.effective_user, 'username'):
             await user_collection.insert_one({
@@ -147,6 +169,7 @@ async def guess(update: Update, context: CallbackContext) -> None:
                 'username': update.effective_user.username,
                 'first_name': update.effective_user.first_name,
                 'characters': [last_characters[chat_id]],
+                'wallet': 0  # Initialize wallet for new users
             })
 
         
@@ -234,8 +257,70 @@ async def fav(update: Update, context: CallbackContext) -> None:
 
 
 
+async def pre_update_checks(update: Update, context: CallbackContext) -> None:
+    """
+    Performs pre-update checks for maintenance, bans, and freezes.
+    Stops handlers if any checks fail.
+    """
+    if not update.effective_user:
+        return
+
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id if update.effective_chat else 0
+
+    # --- Ban and Freeze Checks ---
+    # These checks apply to everyone, including owners, to prevent accidental usage from a banned account.
+
+    # Check if user is banned
+    if await banned_users_collection.find_one({'user_id': user_id}):
+        raise ApplicationHandlerStop
+
+    # Check if group is banned
+    if chat_id and await banned_groups_collection.find_one({'group_id': chat_id}):
+        try:
+            await context.bot.leave_chat(chat_id)
+        except:
+            pass
+        raise ApplicationHandlerStop
+
+    # --- Maintenance and Freeze Checks for Non-Admins ---
+    if str(user_id) == OWNER_ID or str(user_id) in sudo_users:
+        return
+
+    # Maintenance Mode Check
+    maintenance_status = await get_maintenance_status()
+    if maintenance_status and maintenance_status.get('enabled', False):
+        message = maintenance_status.get('message', DEFAULT_MAINTENANCE_MESSAGE)
+        if update.message:
+            await update.message.reply_text(message)
+        elif update.callback_query:
+            await update.callback_query.answer(message, show_alert=True)
+        raise ApplicationHandlerStop
+
+    # Frozen User Check
+    if await frozen_users_collection.find_one({'user_id': user_id}):
+        if update.message:
+            await update.message.reply_text("❄️ Your account has been frozen. You cannot use the bot.")
+        elif update.callback_query:
+            await update.callback_query.answer("❄️ Your account has been frozen.", show_alert=True)
+        raise ApplicationHandlerStop
+
+    # Frozen Group Check
+    if chat_id and await frozen_groups_collection.find_one({'group_id': chat_id}):
+        if update.message:
+            await update.message.reply_text("❄️ This group has been frozen. The bot's services are temporarily disabled here.")
+        elif update.callback_query:
+            await update.callback_query.answer("❄️ This group has been frozen.", show_alert=True)
+        raise ApplicationHandlerStop
+
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from shivu.modules.shop import refresh_shop_job
+
 def main() -> None:
     """Run bot."""
+
+    application.add_handler(TypeHandler(Update, pre_update_checks), group=-1)
 
     application.add_handler(CommandHandler("fav", fav, block=False))
     application.add_handler(CommandHandler(["guess", "protecc", "collect", "grab", "marry"], guess, block=False))
@@ -247,5 +332,14 @@ def main() -> None:
 if __name__ == "__main__":
     shivuu.start()
     LOGGER.info("Bot started")
+
+    # Start the scheduler
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(refresh_shop_job, 'interval', hours=24, args=[application])
+    scheduler.start()
+
+    # Run the job once at startup
+    asyncio.get_event_loop().run_until_complete(refresh_shop_job(application))
+
     main()
 
