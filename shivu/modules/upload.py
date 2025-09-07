@@ -5,7 +5,7 @@ import aiohttp
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
 
-from shivu import application, sudo_users, collection, db, CHARA_CHANNEL_ID, SUPPORT_CHAT, CATBOX_USER_HASH
+from shivu import application, sudo_users, collection, db, CHARA_CHANNEL_ID, SUPPORT_CHAT
 from shivu.helpers.logger import log_activity
 
 WRONG_FORMAT_TEXT = """Wrong ❌️ format...  Reply to an image with:
@@ -49,7 +49,6 @@ async def upload_to_catbox(file_bytearray: bytearray) -> str:
     url = "https://catbox.moe/user/api.php"
     form_data = aiohttp.FormData()
     form_data.add_field("reqtype", "fileupload")
-    form_data.add_field("userhash", CATBOX_USER_HASH)
     form_data.add_field("fileToUpload", file_bytearray, filename="image.png", content_type="image/png")
 
     async with aiohttp.ClientSession() as session:
